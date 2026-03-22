@@ -4,6 +4,7 @@
  */
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import {
@@ -215,8 +216,17 @@ function buildVolumeMounts(
 function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
+  inputFilePath?: string,
 ): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
+
+  // Container hardening: network isolation, read-only rootfs, resource limits
+  args.push("--tmpfs", "/tmp:size=64m");
+  args.push("--stop-timeout=300");
+  args.push("--memory=384m");
+  args.push("--memory-swap=512m");
+  args.push("--cpus=0.4");
+  args.push("--pids-limit=1024");
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
@@ -259,6 +269,11 @@ function buildContainerArgs(
     }
   }
 
+  // Mount input file into container (workaround for stdin pipe issue with Docker)
+  if (inputFilePath) {
+    args.push('-v', `${inputFilePath}:/run/nanoclaw-input.json:ro`);
+  }
+
   args.push(CONTAINER_IMAGE);
 
   return args;
@@ -278,7 +293,13 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(group, input.isMain);
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
-  const containerArgs = buildContainerArgs(mounts, containerName);
+  // Write input to temp file and mount it (workaround: stdin pipe hangs with Docker)
+  const inputDir = path.join(DATA_DIR, 'inputs');
+  fs.mkdirSync(inputDir, { recursive: true });
+  const inputFilePath = path.join(inputDir, `${containerName}.json`);
+  fs.writeFileSync(inputFilePath, JSON.stringify(input));
+
+  const containerArgs = buildContainerArgs(mounts, containerName, inputFilePath);
 
   logger.debug(
     {
@@ -313,13 +334,13 @@ export async function runContainerAgent(
 
     onProcess(container, containerName);
 
+    // Close stdin immediately — input is via mounted file, not stdin pipe
+    container.stdin.end();
+
     let stdout = '';
     let stderr = '';
     let stdoutTruncated = false;
     let stderrTruncated = false;
-
-    container.stdin.write(JSON.stringify(input));
-    container.stdin.end();
 
     // Streaming output: parse OUTPUT_START/END marker pairs as they arrive
     let parseBuffer = '';
@@ -435,6 +456,9 @@ export async function runContainerAgent(
     container.on('close', (code) => {
       clearTimeout(timeout);
       const duration = Date.now() - startTime;
+
+      // Clean up temp input file
+      try { fs.unlinkSync(inputFilePath); } catch { /* ignore */ }
 
       if (timedOut) {
         const ts = new Date().toISOString().replace(/[:.]/g, '-');

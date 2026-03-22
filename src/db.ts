@@ -146,6 +146,12 @@ export function initDatabase(): void {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
   db = new Database(dbPath);
+
+  // SQLite performance tuning
+  db.pragma('journal_mode=WAL');
+  db.pragma('synchronous=NORMAL');
+  db.pragma('cache_size=-64000');
+
   createSchema(db);
 
   // Migrate from JSON files if they exist

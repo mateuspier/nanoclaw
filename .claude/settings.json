@@ -1,1 +1,39 @@
-{}
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(git *)",
+      "Bash(docker *)",
+      "Bash(sudo systemctl * nanoclaw)",
+      "Bash(sudo -u nanoclaw cat *)",
+      "Bash(sudo -u nanoclaw ls *)",
+      "Bash(sudo -u nanoclaw mkdir *)",
+      "Bash(sudo -u nanoclaw cp *)",
+      "Bash(sudo -u nanoclaw git *)",
+      "Bash(sudo -u nanoclaw npm *)",
+      "Bash(sudo -u nanoclaw node *)",
+      "Bash(sudo journalctl *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(echo *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(stat *)",
+      "Bash(chmod *)",
+      "Bash(curl localhost*)",
+      "Bash(sqlite3 *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(sudo rm -rf *)",
+      "Bash(curl * | sh)",
+      "Bash(wget * | sh)"
+    ]
+  }
+}

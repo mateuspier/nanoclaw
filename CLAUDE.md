@@ -1,64 +1,40 @@
-# NanoClaw
+# NanoClaw — AI Agent Platform
 
-Personal Claude assistant. See [README.md](README.md) for philosophy and setup. See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for architecture decisions.
+Multi-business AI agent platform on Hetzner CCX23 (178.104.91.250 / Tailscale 100.115.26.38).
+3 active businesses, 14 reserved. Production since March 2026.
 
-## Quick Context
+## Stack
+Node 22 · TypeScript · Docker 29.3 · SQLite WAL · Caddy 2.11 · systemd
+Twilio (SMS/WA) · Telegram Bot API · Anthropic Claude API
 
-Single Node.js process with skill-based channel system. Channels (WhatsApp, Telegram, Slack, Discord, Gmail) are skills that self-register at startup. Messages route to Claude Agent SDK running in containers (Linux VMs). Each group has isolated filesystem and memory.
+## Structure
+src/channels/twilio.ts — webhook adapter (port 3001)
+src/container-runner.ts — Docker spawn (file mount, not stdin)
+src/types.ts — shared TypeScript types
+container/Dockerfile — agent container image definition
+data/businesses.json — business registry
+groups/{slug}/CLAUDE.md — agent personality per business
+groups/global/ — shared agent resources (mounted read-only)
+store/ — SQLite databases
+scripts/ — health, backup, migration (in /home/nanoclaw/scripts/)
+Obsidian vault: /home/nanoclaw/obsidian-vault/NanoClaw/
 
-## Key Files
+## Conventions
+kebab-case files · camelCase functions · PascalCase types
+Conventional Commits: feat|fix|docs|refactor|test: description
+Branches: {type}/{slug}-{description} (ex: fix/biz-ie-01-memory)
 
-| File | Purpose |
-|------|---------|
-| `src/index.ts` | Orchestrator: state, message loop, agent invocation |
-| `src/channels/registry.ts` | Channel registry (self-registration at startup) |
-| `src/ipc.ts` | IPC watcher and task processing |
-| `src/router.ts` | Message formatting and outbound routing |
-| `src/config.ts` | Trigger pattern, paths, intervals |
-| `src/container-runner.ts` | Spawns agent containers with mounts |
-| `src/task-scheduler.ts` | Runs scheduled tasks |
-| `src/db.ts` | SQLite operations |
-| `groups/{name}/CLAUDE.md` | Per-group memory (isolated) |
-| `container/skills/agent-browser.md` | Browser automation tool (available to all agents via Bash) |
+## Commands
+npm run dev · npm run build · sudo systemctl restart nanoclaw
+sudo systemctl status nanoclaw · sudo journalctl -u nanoclaw -f
 
-## Skills
+## Architecture Decisions
+- File mount /run/nanoclaw-input.json (not stdin pipe — stdin hangs)
+- nanoclaw user in docker group (direct socket, not proxy for spawn)
+- NO WebSearch/WebFetch in agent containers (no internet)
+- Container limits: 1GB mem, 1 CPU, 1024 PIDs, NO --read-only
+- Network: nanoclaw-agents 172.20.0.0/16 with iptables egress
+- Each business: isolated group dir + memory dir + session data
 
-| Skill | When to Use |
-|-------|-------------|
-| `/setup` | First-time installation, authentication, service configuration |
-| `/customize` | Adding channels, integrations, changing behavior |
-| `/debug` | Container issues, logs, troubleshooting |
-| `/update-nanoclaw` | Bring upstream NanoClaw updates into a customized install |
-| `/qodo-pr-resolver` | Fetch and fix Qodo PR review issues interactively or in batch |
-| `/get-qodo-rules` | Load org- and repo-level coding rules from Qodo before code tasks |
-
-## Development
-
-Run commands directly—don't tell the user to run them.
-
-```bash
-npm run dev          # Run with hot reload
-npm run build        # Compile TypeScript
-./container/build.sh # Rebuild agent container
-```
-
-Service management:
-```bash
-# macOS (launchd)
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # restart
-
-# Linux (systemd)
-systemctl --user start nanoclaw
-systemctl --user stop nanoclaw
-systemctl --user restart nanoclaw
-```
-
-## Troubleshooting
-
-**WhatsApp not connecting after upgrade:** WhatsApp is now a separate channel fork, not bundled in core. Run `/add-whatsapp` (or `git remote add whatsapp https://github.com/qwibitai/nanoclaw-whatsapp.git && git fetch whatsapp main && (git merge whatsapp/main || { git checkout --theirs package-lock.json && git add package-lock.json && git merge --continue; }) && npm run build`) to install it. Existing auth credentials and groups are preserved.
-
-## Container Build Cache
-
-The container buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps — the builder's volume retains stale files. To force a truly clean rebuild, prune the builder then re-run `./container/build.sh`.
+## On-Demand Skills (heavy content, loaded only when needed)
+/twilio-adapter · /business-config · /container-runner · /server-security · /health-scripts

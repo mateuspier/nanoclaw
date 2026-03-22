@@ -1,0 +1,71 @@
+# Dependencies (thousands of files, never edited)
+node_modules/
+container/node_modules/
+.venv/
+vendor/
+
+# Build & cache (regenerated, never edited)
+dist/
+build/
+.next/
+.vite/
+.turbo/
+__pycache__/
+target/
+*.tsbuildinfo
+
+# Lock files (huge, auto-generated)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Database files (binary, not code)
+store/*.db
+store/*.db-wal
+store/*.db-shm
+
+# Agent input files (ephemeral, auto-deleted)
+data/inputs/
+
+# Session files (binary/JSON, managed by NanoClaw)
+data/sessions/
+
+# Backups (binary, large, encrypted)
+backups/
+
+# Logs (text but large, read via scripts not Claude)
+logs/
+
+# Git internals
+.git/
+
+# Binary assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.mp4
+*.webm
+
+# Generated/minified
+*.map
+*.min.js
+*.min.css
+
+# Environment & secrets (security)
+.env
+.env.*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+coverage/
+.nyc_output/
+playwright-report/

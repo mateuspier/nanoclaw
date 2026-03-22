@@ -64,10 +64,7 @@ function validateTwilioSignature(
     .createHmac('sha1', authToken)
     .update(data)
     .digest('base64');
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected),
-  );
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }
 
 // --- Parse URL-encoded body ---
@@ -289,10 +286,7 @@ export class TwilioChannel implements Channel {
       this.server = createServer((req, res) => this.handleRequest(req, res));
 
       this.server.listen(this.port, '0.0.0.0', () => {
-        logger.info(
-          { port: this.port },
-          'Twilio webhook server listening',
-        );
+        logger.info({ port: this.port }, 'Twilio webhook server listening');
         resolve();
       });
     });
@@ -397,9 +391,7 @@ export class TwilioChannel implements Channel {
     });
   }
 
-  private async processIncoming(
-    params: Record<string, string>,
-  ): Promise<void> {
+  private async processIncoming(params: Record<string, string>): Promise<void> {
     const msg: TwilioMessage = {
       MessageSid: params.MessageSid || '',
       From: params.From || '',
@@ -411,7 +403,10 @@ export class TwilioChannel implements Channel {
 
     // Deduplication
     if (this.seenMessageSids.has(msg.MessageSid)) {
-      logger.debug({ sid: msg.MessageSid }, 'Duplicate Twilio message, skipping');
+      logger.debug(
+        { sid: msg.MessageSid },
+        'Duplicate Twilio message, skipping',
+      );
       return;
     }
     this.seenMessageSids.add(msg.MessageSid);
@@ -471,10 +466,7 @@ export class TwilioChannel implements Channel {
     // Check if this business JID is registered
     const group = this.opts.registeredGroups()[chatJid];
     if (!group) {
-      logger.debug(
-        { chatJid, slug },
-        'Twilio message for unregistered JID',
-      );
+      logger.debug({ chatJid, slug }, 'Twilio message for unregistered JID');
       return;
     }
 
@@ -540,7 +532,11 @@ export class TwilioChannel implements Channel {
     const bizName = this.slugToName.get(slug) || slug;
 
     try {
-      const result = await this.client.sendMessage(fromPhone, recipientPhone, text);
+      const result = await this.client.sendMessage(
+        fromPhone,
+        recipientPhone,
+        text,
+      );
       logger.info(
         { jid, to: recipientPhone, sid: result.sid, length: text.length },
         'Twilio message sent',
@@ -605,12 +601,21 @@ registerChannel('twilio', (opts: ChannelOpts) => {
   const tgBotToken =
     process.env.TELEGRAM_BOT_TOKEN || envVars.TELEGRAM_BOT_TOKEN || '';
   const tgLogsChannelId =
-    process.env.TELEGRAM_LOGS_CHANNEL_ID || envVars.TELEGRAM_LOGS_CHANNEL_ID || '';
+    process.env.TELEGRAM_LOGS_CHANNEL_ID ||
+    envVars.TELEGRAM_LOGS_CHANNEL_ID ||
+    '';
 
   if (!accountSid || !authToken) {
     logger.info('Twilio: credentials not set, channel disabled');
     return null;
   }
 
-  return new TwilioChannel(accountSid, authToken, port, tgBotToken, tgLogsChannelId, opts);
+  return new TwilioChannel(
+    accountSid,
+    authToken,
+    port,
+    tgBotToken,
+    tgLogsChannelId,
+    opts,
+  );
 });

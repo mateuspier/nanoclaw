@@ -223,30 +223,17 @@ function buildContainerArgs(
   // Container hardening: network isolation, read-only rootfs, resource limits
   args.push("--tmpfs", "/tmp:size=64m");
   args.push("--stop-timeout=300");
-  args.push("--memory=384m");
-  args.push("--memory-swap=512m");
-  args.push("--cpus=0.4");
+  args.push("--memory=1g");
+  args.push("--memory-swap=1g");
+  args.push("--cpus=1.0");
   args.push("--pids-limit=1024");
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
 
-  // Route API traffic through the credential proxy (containers never see real secrets)
-  args.push(
-    '-e',
-    `ANTHROPIC_BASE_URL=http://${CONTAINER_HOST_GATEWAY}:${CREDENTIAL_PROXY_PORT}`,
-  );
-
-  // Mirror the host's auth method with a placeholder value.
-  // API key mode: SDK sends x-api-key, proxy replaces with real key.
-  // OAuth mode:   SDK exchanges placeholder token for temp API key,
-  //               proxy injects real OAuth token on that exchange request.
-  const authMode = detectAuthMode();
-  if (authMode === 'api-key') {
-    args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
-  } else {
-    args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
-  }
+  // Pass API key directly to container (bypasses credential proxy)
+  const apiKey = process.env.ANTHROPIC_API_KEY || '';
+  args.push('-e', `ANTHROPIC_API_KEY=${apiKey}`);
 
   // Runtime-specific args for host gateway resolution
   args.push(...hostGatewayArgs());
@@ -270,6 +257,10 @@ function buildContainerArgs(
   }
 
   // Mount input file into container (workaround for stdin pipe issue with Docker)
+  if (inputFilePath) {
+    args.push('-v', `${inputFilePath}:/run/nanoclaw-input.json:ro`);
+  }
+
   if (inputFilePath) {
     args.push('-v', `${inputFilePath}:/run/nanoclaw-input.json:ro`);
   }
@@ -456,6 +447,8 @@ export async function runContainerAgent(
     container.on('close', (code) => {
       clearTimeout(timeout);
       const duration = Date.now() - startTime;
+
+      try { fs.unlinkSync(inputFilePath); } catch { /* ignore */ }
 
       // Clean up temp input file
       try { fs.unlinkSync(inputFilePath); } catch { /* ignore */ }

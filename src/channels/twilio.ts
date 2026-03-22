@@ -84,7 +84,7 @@ function parseUrlEncoded(body: string): Record<string, string> {
 
 // --- Telegram logs channel forwarder ---
 
-function postToLogsChannel(
+function sendTgMessage(
   botToken: string,
   channelId: string,
   text: string,
@@ -105,13 +105,25 @@ function postToLogsChannel(
       },
     },
     (res) => {
-      // Drain response
       res.resume();
       if (res.statusCode && res.statusCode >= 400) {
-        logger.warn(
-          { statusCode: res.statusCode },
-          'Failed to post to Telegram logs channel',
+        // Markdown parse failure — retry as plain text
+        const plainData = JSON.stringify({ chat_id: channelId, text });
+        const retry = https.request(
+          {
+            hostname: 'api.telegram.org',
+            path: `/bot${botToken}/sendMessage`,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(plainData),
+            },
+          },
+          (r) => r.resume(),
         );
+        retry.on('error', () => {});
+        retry.write(plainData);
+        retry.end();
       }
     },
   );
@@ -120,6 +132,22 @@ function postToLogsChannel(
   });
   req.write(postData);
   req.end();
+}
+
+function postToLogsChannel(
+  botToken: string,
+  channelId: string,
+  text: string,
+): void {
+  // Telegram limit is 4096 chars per message — split if needed
+  const MAX_LEN = 4096;
+  if (text.length <= MAX_LEN) {
+    sendTgMessage(botToken, channelId, text);
+    return;
+  }
+  for (let i = 0; i < text.length; i += MAX_LEN) {
+    sendTgMessage(botToken, channelId, text.slice(i, i + MAX_LEN));
+  }
 }
 
 // --- Twilio API client ---
@@ -543,7 +571,7 @@ export class TwilioChannel implements Channel {
       );
       // Log outbound to Telegram logs channel
       this.logToTelegram(
-        `[${slug}] \u{1f4e4} ${bizName} \u{2192} ${recipientPhone}: '${text.slice(0, 200)}${text.length > 200 ? '...' : ''}'`,
+        `[${slug}] \u{1f4e4} ${bizName} \u{2192} ${recipientPhone}: '${text}'`,
       );
     } catch (err) {
       logger.error({ jid, err }, 'Failed to send Twilio message');

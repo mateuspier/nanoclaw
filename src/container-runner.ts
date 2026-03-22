@@ -221,12 +221,12 @@ function buildContainerArgs(
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
   // Container hardening: network isolation, read-only rootfs, resource limits
-  args.push("--tmpfs", "/tmp:size=64m");
-  args.push("--stop-timeout=300");
-  args.push("--memory=1g");
-  args.push("--memory-swap=1g");
-  args.push("--cpus=1.0");
-  args.push("--pids-limit=1024");
+  args.push('--tmpfs', '/tmp:size=64m');
+  args.push('--stop-timeout=300');
+  args.push('--memory=1g');
+  args.push('--memory-swap=1g');
+  args.push('--cpus=1.0');
+  args.push('--pids-limit=1024');
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
@@ -290,7 +290,11 @@ export async function runContainerAgent(
   const inputFilePath = path.join(inputDir, `${containerName}.json`);
   fs.writeFileSync(inputFilePath, JSON.stringify(input));
 
-  const containerArgs = buildContainerArgs(mounts, containerName, inputFilePath);
+  const containerArgs = buildContainerArgs(
+    mounts,
+    containerName,
+    inputFilePath,
+  );
 
   logger.debug(
     {
@@ -448,10 +452,18 @@ export async function runContainerAgent(
       clearTimeout(timeout);
       const duration = Date.now() - startTime;
 
-      try { fs.unlinkSync(inputFilePath); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(inputFilePath);
+      } catch {
+        /* ignore */
+      }
 
       // Clean up temp input file
-      try { fs.unlinkSync(inputFilePath); } catch { /* ignore */ }
+      try {
+        fs.unlinkSync(inputFilePath);
+      } catch {
+        /* ignore */
+      }
 
       if (timedOut) {
         const ts = new Date().toISOString().replace(/[:.]/g, '-');

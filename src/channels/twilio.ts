@@ -150,6 +150,109 @@ function postToLogsChannel(
   }
 }
 
+
+
+// --- Alerts channel forwarder ---
+
+function postToAlertsChannel(text: string): void {
+  // Uses module-level env vars set during registration
+  const token = _alertsBotToken;
+  const channelId = _alertsChannelId;
+  if (!token || !channelId) return;
+  sendTgMessage(token, channelId, text);
+}
+
+// Module-level alert config (set during channel registration)
+let _alertsBotToken = '';
+let _alertsChannelId = '';
+
+// --- Response quality guard ---
+
+function validateResponse(
+  text: string,
+  slug: string,
+): { valid: boolean; reason?: string } {
+  if (!text || text.trim().length === 0) {
+    return { valid: false, reason: 'empty_response' };
+  }
+  if (text.trim().length < 10) {
+    return { valid: false, reason: 'too_short' };
+  }
+  const errorPatterns = [
+    /^request timed out$/i,
+    /^internal server error$/i,
+    /ECONNREFUSED/,
+    /ETIMEDOUT/,
+    /^\[object Object\]$/,
+    /at .+\.ts:\d+:\d+/,
+    /Error:.*stack/i,
+  ];
+  for (const pattern of errorPatterns) {
+    if (pattern.test(text)) {
+      return { valid: false, reason: 'error_leaked: ' + pattern.source };
+    }
+  }
+  return { valid: true };
+}
+
+
+
+// --- Per-business circuit breaker ---
+
+interface BusinessHealth {
+  failures: number;
+  firstFailure: number;
+  lastFailure: number;
+  circuitOpen: boolean;
+}
+
+const businessHealth: Map<string, BusinessHealth> = new Map();
+
+function trackFailure(slug: string): void {
+  const h = businessHealth.get(slug) || {
+    failures: 0,
+    firstFailure: 0,
+    lastFailure: 0,
+    circuitOpen: false,
+  };
+  if (h.failures === 0) {
+    h.firstFailure = Date.now();
+  }
+  h.failures++;
+  h.lastFailure = Date.now();
+  if (h.failures >= 3 && Date.now() - h.firstFailure < 300000) {
+    h.circuitOpen = true;
+    postToAlertsChannel(
+      `\u26a0\ufe0f [${slug}] Circuit OPEN \u2014 ${h.failures} failures in ${Math.round((Date.now() - h.firstFailure) / 1000)}s. Auto-recovering in 5min.`,
+    );
+  }
+  businessHealth.set(slug, h);
+}
+
+function trackSuccess(slug: string): void {
+  businessHealth.set(slug, {
+    failures: 0,
+    firstFailure: 0,
+    lastFailure: 0,
+    circuitOpen: false,
+  });
+}
+
+function isBusinessHealthy(slug: string): boolean {
+  const h = businessHealth.get(slug);
+  if (!h || !h.circuitOpen) return true;
+  if (Date.now() - h.lastFailure > 300000) {
+    h.circuitOpen = false;
+    h.failures = 0;
+    h.firstFailure = 0;
+    postToAlertsChannel(
+      `\u2705 [${slug}] Circuit CLOSED \u2014 auto-recovered after 5min.`,
+    );
+    return true;
+  }
+  return false;
+}
+
 // --- Twilio API client ---
 
 class TwilioClient {
@@ -491,6 +594,15 @@ export class TwilioChannel implements Channel {
       false,
     );
 
+    // Circuit breaker: reject if business is failing repeatedly
+    if (!isBusinessHealthy(slug)) {
+      this.logToTelegram(
+        `\u26a0\ufe0f [${slug}] Message rejected \u2014 circuit open.`,
+      );
+      logger.warn({ slug, from: senderPhone }, 'Circuit open, message rejected');
+      return;
+    }
+
     // Check if this business JID is registered
     const group = this.opts.registeredGroups()[chatJid];
     if (!group) {
@@ -558,6 +670,19 @@ export class TwilioChannel implements Channel {
     }
 
     const bizName = this.slugToName.get(slug) || slug;
+
+    // Quality guard: block error messages from reaching clients
+    const validation = validateResponse(text, slug);
+    if (!validation.valid) {
+      postToAlertsChannel(
+        `\u26a0\ufe0f [${slug}] Bad response blocked: ${validation.reason}`,
+      );
+      logger.warn({ slug, reason: validation.reason }, 'Bad response blocked');
+      text = 'Obrigado pela mensagem! Estou processando e respondo em breve.';
+      trackFailure(slug);
+    } else {
+      trackSuccess(slug);
+    }
 
     try {
       const result = await this.client.sendMessage(

@@ -217,6 +217,7 @@ function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
   inputFilePath?: string,
+  extraEnv?: Record<string, string>,
 ): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
@@ -234,6 +235,13 @@ function buildContainerArgs(
   // Pass API key directly to container (bypasses credential proxy)
   const apiKey = process.env.ANTHROPIC_API_KEY || '';
   args.push('-e', `ANTHROPIC_API_KEY=${apiKey}`);
+
+  // Per-group environment variables (e.g., git credentials, deploy tokens)
+  if (extraEnv) {
+    for (const [key, value] of Object.entries(extraEnv)) {
+      args.push('-e', `${key}=${value}`);
+    }
+  }
 
   // Runtime-specific args for host gateway resolution
   args.push(...hostGatewayArgs());
@@ -294,6 +302,7 @@ export async function runContainerAgent(
     mounts,
     containerName,
     inputFilePath,
+    group.containerConfig?.env,
   );
 
   logger.debug(

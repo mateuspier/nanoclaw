@@ -30,6 +30,7 @@ export interface AllowedRoot {
 export interface ContainerConfig {
   additionalMounts?: AdditionalMount[];
   timeout?: number; // Default: 300000 (5 minutes)
+  env?: Record<string, string>; // Extra environment variables passed to the container
 }
 
 export interface RegisteredGroup {
@@ -91,7 +92,12 @@ export interface Channel {
   // Optional: sync group/chat names from the platform.
   syncGroups?(force: boolean): Promise<void>;
   // Optional: send photo with inline keyboard (for approval workflows)
-  sendPhoto?(jid: string, photoPath: string, caption: string, replyMarkup?: unknown): Promise<number>;
+  sendPhoto?(
+    jid: string,
+    photoPath: string,
+    caption: string,
+    replyMarkup?: unknown,
+  ): Promise<number>;
 }
 
 export interface WorkflowApproval {

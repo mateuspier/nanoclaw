@@ -90,6 +90,24 @@ export interface Channel {
   setTyping?(jid: string, isTyping: boolean): Promise<void>;
   // Optional: sync group/chat names from the platform.
   syncGroups?(force: boolean): Promise<void>;
+  // Optional: send photo with inline keyboard (for approval workflows)
+  sendPhoto?(jid: string, photoPath: string, caption: string, replyMarkup?: unknown): Promise<number>;
+}
+
+export interface WorkflowApproval {
+  id: string;
+  group_folder: string;
+  chat_jid: string;
+  branch: string;
+  task_description: string;
+  preview_url: string | null;
+  screenshot_path: string | null;
+  diff_summary: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'adjusting';
+  feedback: string | null;
+  telegram_message_id: number | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 // Callback type that channels use to deliver inbound messages

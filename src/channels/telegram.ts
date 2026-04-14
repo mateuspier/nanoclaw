@@ -1,5 +1,6 @@
+import fs from 'fs';
 import https from 'https';
-import { Api, Bot } from 'grammy';
+import { Api, Bot, InputFile } from 'grammy';
 
 import { ASSISTANT_NAME, TRIGGER_PATTERN } from '../config.js';
 import { readEnvFile } from '../env.js';
@@ -16,6 +17,7 @@ export interface TelegramChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
   registeredGroups: () => Record<string, RegisteredGroup>;
+  onCallbackQuery?: (senderId: string, data: string, ctx: any) => void;
 }
 
 /**
@@ -214,6 +216,15 @@ export class TelegramChannel implements Channel {
     this.bot.on('message:location', (ctx) => storeNonText(ctx, '[Location]'));
     this.bot.on('message:contact', (ctx) => storeNonText(ctx, '[Contact]'));
 
+    // Handle approval callback queries (inline keyboard buttons)
+    this.bot.on('callback_query:data', async (ctx) => {
+      const data = ctx.callbackQuery.data;
+      await ctx.answerCallbackQuery();
+      if (this.opts.onCallbackQuery) {
+        this.opts.onCallbackQuery(ctx.from.id.toString(), data, ctx);
+      }
+    });
+
     // Handle errors gracefully
     this.bot.catch((err) => {
       logger.error({ err: err.message }, 'Telegram bot error');
@@ -263,6 +274,24 @@ export class TelegramChannel implements Channel {
     } catch (err) {
       logger.error({ jid, err }, 'Failed to send Telegram message');
     }
+  }
+
+  async sendPhoto(
+    jid: string,
+    photoPath: string,
+    caption: string,
+    replyMarkup?: unknown,
+  ): Promise<number> {
+    if (!this.bot) throw new Error('Telegram bot not initialized');
+
+    const numericId = jid.replace(/^tg:/, '');
+    const photo = new InputFile(fs.createReadStream(photoPath));
+    const opts: Record<string, unknown> = { caption, parse_mode: 'Markdown' };
+    if (replyMarkup) opts.reply_markup = replyMarkup;
+
+    const msg = await this.bot.api.sendPhoto(numericId, photo, opts);
+    logger.info({ jid, photoPath }, 'Telegram photo sent');
+    return msg.message_id;
   }
 
   isConnected(): boolean {

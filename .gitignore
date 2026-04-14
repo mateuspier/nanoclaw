@@ -17,6 +17,9 @@ groups/main/*
 groups/global/*
 !groups/main/CLAUDE.md
 !groups/global/CLAUDE.md
+!groups/proj-miaupop/
+groups/proj-miaupop/*
+!groups/proj-miaupop/CLAUDE.md
 
 # Secrets
 *.keys.json

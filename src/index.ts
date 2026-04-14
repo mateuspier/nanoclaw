@@ -46,6 +46,7 @@ import { GroupQueue } from './group-queue.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
+import { handleApprovalCallback } from './workflows/approval-handler.js';
 import {
   restoreRemoteControl,
   startRemoteControl,
@@ -538,6 +539,14 @@ async function main(): Promise<void> {
 
   // Channel callbacks (shared by all channels)
   const channelOpts = {
+    onCallbackQuery: (senderId: string, data: string, ctx: any) => {
+      handleApprovalCallback(senderId, data, ctx, {
+        channels,
+        findChannel,
+      }).catch((err) =>
+        logger.error({ err, senderId, data }, 'Approval callback error'),
+      );
+    },
     onMessage: (chatJid: string, msg: NewMessage) => {
       // Remote control commands — intercept before storage
       const trimmed = msg.content.trim();
@@ -619,6 +628,11 @@ async function main(): Promise<void> {
       const channel = findChannel(channels, jid);
       if (!channel) throw new Error(`No channel for JID: ${jid}`);
       return channel.sendMessage(jid, text);
+    },
+    sendPhoto: (jid, photoPath, caption, replyMarkup) => {
+      const channel = findChannel(channels, jid);
+      if (!channel?.sendPhoto) throw new Error(`No photo-capable channel for JID: ${jid}`);
+      return channel.sendPhoto(jid, photoPath, caption, replyMarkup);
     },
     registeredGroups: () => registeredGroups,
     registerGroup,

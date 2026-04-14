@@ -5,13 +5,14 @@ import { CronExpressionParser } from 'cron-parser';
 
 import { DATA_DIR, IPC_POLL_INTERVAL, TIMEZONE } from './config.js';
 import { AvailableGroup } from './container-runner.js';
-import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
+import { createApproval, createTask, deleteTask, getTaskById, updateApprovalMessageId, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
 import { logger } from './logger.js';
-import { RegisteredGroup } from './types.js';
+import { Channel, RegisteredGroup } from './types.js';
 
 export interface IpcDeps {
   sendMessage: (jid: string, text: string) => Promise<void>;
+  sendPhoto: (jid: string, photoPath: string, caption: string, replyMarkup?: unknown) => Promise<number>;
   registeredGroups: () => Record<string, RegisteredGroup>;
   registerGroup: (jid: string, group: RegisteredGroup) => void;
   syncGroups: (force: boolean) => Promise<void>;
@@ -165,6 +166,13 @@ export async function processTaskIpc(
     groupFolder?: string;
     chatJid?: string;
     targetJid?: string;
+    // For workflow_approval
+    taskDescription?: string;
+    branch?: string;
+    screenshotPath?: string;
+    diffSummary?: string;
+    previewUrl?: string;
+    workflowId?: string;
     // For register_group
     jid?: string;
     name?: string;
@@ -452,6 +460,73 @@ export async function processTaskIpc(
           { data },
           'Invalid register_group request - missing required fields',
         );
+      }
+      break;
+
+    case 'workflow_approval':
+      if (data.workflowId && data.taskDescription && data.branch) {
+        // Find the chat JID for this group
+        let approvalChatJid: string | undefined;
+        for (const [jid, group] of Object.entries(registeredGroups)) {
+          if (group.folder === sourceGroup) {
+            approvalChatJid = jid;
+            break;
+          }
+        }
+        if (!approvalChatJid) {
+          logger.warn({ sourceGroup }, 'No chat JID found for approval group');
+          break;
+        }
+
+        const approvalId = data.workflowId;
+        const caption = [
+          `*${data.taskDescription}*`,
+          '',
+          `Branch: \`${data.branch}\``,
+          data.diffSummary ? `Changes: ${data.diffSummary}` : '',
+          data.previewUrl ? `Preview: ${data.previewUrl}` : '',
+        ].filter(Boolean).join('\n');
+
+        const replyMarkup = {
+          inline_keyboard: [[
+            { text: '✅ Aprovar', callback_data: `approve:${approvalId}` },
+            { text: '❌ Rejeitar', callback_data: `reject:${approvalId}` },
+            { text: '✏️ Ajustar', callback_data: `adjust:${approvalId}` },
+          ]],
+        };
+
+        // Create approval record
+        createApproval({
+          id: approvalId,
+          group_folder: sourceGroup,
+          chat_jid: approvalChatJid,
+          branch: data.branch,
+          task_description: data.taskDescription,
+          preview_url: data.previewUrl || null,
+          screenshot_path: data.screenshotPath || null,
+          diff_summary: data.diffSummary || null,
+          status: 'pending',
+          feedback: null,
+          telegram_message_id: null,
+          created_at: new Date().toISOString(),
+          resolved_at: null,
+        });
+
+        // Send photo or text-only approval
+        try {
+          if (data.screenshotPath) {
+            const msgId = await deps.sendPhoto(approvalChatJid, data.screenshotPath, caption, replyMarkup);
+            updateApprovalMessageId(approvalId, msgId);
+          } else {
+            // Fallback: send as text with inline keyboard
+            await deps.sendMessage(approvalChatJid, caption);
+          }
+          logger.info({ approvalId, sourceGroup, branch: data.branch }, 'Workflow approval sent');
+        } catch (err) {
+          logger.error({ approvalId, err }, 'Failed to send approval message');
+        }
+      } else {
+        logger.warn({ data }, 'Invalid workflow_approval - missing required fields');
       }
       break;
 

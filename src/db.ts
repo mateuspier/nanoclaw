@@ -10,6 +10,7 @@ import {
   RegisteredGroup,
   ScheduledTask,
   TaskRunLog,
+  WorkflowApproval,
 } from './types.js';
 
 let db: Database.Database;
@@ -64,6 +65,23 @@ function createSchema(database: Database.Database): void {
       FOREIGN KEY (task_id) REFERENCES scheduled_tasks(id)
     );
     CREATE INDEX IF NOT EXISTS idx_task_run_logs ON task_run_logs(task_id, run_at);
+
+    CREATE TABLE IF NOT EXISTS workflow_approvals (
+      id TEXT PRIMARY KEY,
+      group_folder TEXT NOT NULL,
+      chat_jid TEXT NOT NULL,
+      branch TEXT NOT NULL,
+      task_description TEXT NOT NULL,
+      preview_url TEXT,
+      screenshot_path TEXT,
+      diff_summary TEXT,
+      status TEXT DEFAULT 'pending',
+      feedback TEXT,
+      telegram_message_id INTEGER,
+      created_at TEXT NOT NULL,
+      resolved_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_workflow_approvals_status ON workflow_approvals(status);
 
     CREATE TABLE IF NOT EXISTS router_state (
       key TEXT PRIMARY KEY,
@@ -500,6 +518,52 @@ export function logTaskRun(log: TaskRunLog): void {
     log.result,
     log.error,
   );
+}
+
+
+// --- Workflow approval accessors ---
+
+export function createApproval(approval: WorkflowApproval): void {
+  db.prepare(
+    `INSERT INTO workflow_approvals (id, group_folder, chat_jid, branch, task_description, preview_url, screenshot_path, diff_summary, status, feedback, telegram_message_id, created_at, resolved_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    approval.id,
+    approval.group_folder,
+    approval.chat_jid,
+    approval.branch,
+    approval.task_description,
+    approval.preview_url,
+    approval.screenshot_path,
+    approval.diff_summary,
+    approval.status,
+    approval.feedback,
+    approval.telegram_message_id,
+    approval.created_at,
+    approval.resolved_at,
+  );
+}
+
+export function getPendingApproval(id: string): WorkflowApproval | undefined {
+  return db
+    .prepare("SELECT * FROM workflow_approvals WHERE id = ? AND status = 'pending'")
+    .get(id) as WorkflowApproval | undefined;
+}
+
+export function resolveApproval(
+  id: string,
+  status: 'approved' | 'rejected' | 'adjusting',
+  feedback?: string,
+): void {
+  db.prepare(
+    `UPDATE workflow_approvals SET status = ?, feedback = ?, resolved_at = ? WHERE id = ?`,
+  ).run(status, feedback || null, new Date().toISOString(), id);
+}
+
+export function updateApprovalMessageId(id: string, messageId: number): void {
+  db.prepare(
+    'UPDATE workflow_approvals SET telegram_message_id = ? WHERE id = ?',
+  ).run(messageId, id);
 }
 
 // --- Router state accessors ---

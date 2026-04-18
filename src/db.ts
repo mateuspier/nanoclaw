@@ -215,6 +215,21 @@ export function _initTestDatabase(): void {
 }
 
 /**
+ * Open the existing store in read-only mode. Skips schema creation + JSON
+ * migration, so it's safe to run from unprivileged CLIs (dashboards,
+ * reporters) that only need to SELECT. Throws if the store file doesn't
+ * exist — readonly openers must not create a new DB.
+ */
+export function initReadOnlyDatabase(): void {
+  const dbPath = path.join(STORE_DIR, 'messages.db');
+  if (!fs.existsSync(dbPath)) {
+    throw new Error(`Database not found at ${dbPath}`);
+  }
+  db = new Database(dbPath, { readonly: true, fileMustExist: true });
+  // No schema creation, no migrations — readonly opener is select-only.
+}
+
+/**
  * Store chat metadata only (no message content).
  * Used for all chats to enable group discovery without storing sensitive content.
  */

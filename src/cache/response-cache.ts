@@ -113,7 +113,11 @@ export function normalizePrompt(input: string): string {
 }
 
 /** SHA-256 of (group || channel || normalizedPrompt). Collision-free for our scale. */
-export function cacheKey(groupFolder: string, channel: string, normalizedPrompt: string): string {
+export function cacheKey(
+  groupFolder: string,
+  channel: string,
+  normalizedPrompt: string,
+): string {
   return crypto
     .createHash('sha256')
     .update(`${groupFolder}\u0001${channel}\u0001${normalizedPrompt}`)
@@ -154,12 +158,22 @@ export function extractCacheDirectives(response: string): CacheDirectives {
     const n = parseInt(match[1], 10);
     const unit = match[2].toLowerCase();
     const seconds =
-      unit === 'd' ? n * 86400 : unit === 'h' ? n * 3600 : unit === 'm' ? n * 60 : n;
+      unit === 'd'
+        ? n * 86400
+        : unit === 'h'
+          ? n * 3600
+          : unit === 'm'
+            ? n * 60
+            : n;
     ttlSeconds = Math.min(seconds, MAX_TTL_SECONDS);
   }
   TAG_TTL_RE.lastIndex = 0;
 
-  const cleaned = response.replace(TAG_NO_CACHE_RE, '').replace(TAG_TTL_RE, '').replace(/\s+/g, ' ').trim();
+  const cleaned = response
+    .replace(TAG_NO_CACHE_RE, '')
+    .replace(TAG_TTL_RE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
   return { cleaned, noCache, ttlSeconds };
 }
@@ -209,7 +223,12 @@ export function lookupCached(params: CacheLookupParams): CacheLookupResult {
     0,
     Math.floor((new Date(row.expires_at).getTime() - Date.now()) / 1000),
   );
-  return { hit: true, response: row.response, cachedAt: row.created_at, ttlRemainingSeconds };
+  return {
+    hit: true,
+    response: row.response,
+    cachedAt: row.created_at,
+    ttlRemainingSeconds,
+  };
 }
 
 /**
@@ -283,7 +302,10 @@ export function storeResponse(params: CacheStoreParams): CacheStoreResult {
  * Agents call this after they learn something changed ("event cancelled" →
  * invalidate `%concert%`, `%evento%`, `%ingresso%`).
  */
-export function invalidatePattern(groupFolder: string, pattern: string): number {
+export function invalidatePattern(
+  groupFolder: string,
+  pattern: string,
+): number {
   if (!pattern || pattern.length < 2) {
     throw new Error('invalidatePattern: pattern must be at least 2 chars');
   }
@@ -325,36 +347,65 @@ export function invalidateGroup(groupFolder: string): number {
  */
 export function pruneExpired(): number {
   const db = getDatabase();
-  const result = db.prepare(`DELETE FROM response_cache WHERE expires_at <= ?`).run(isoNow());
+  const result = db
+    .prepare(`DELETE FROM response_cache WHERE expires_at <= ?`)
+    .run(isoNow());
   return result.changes as number;
 }
+
+const EMPTY_STATS: CacheStats = {
+  total: 0,
+  activeEntries: 0,
+  expiredEntries: 0,
+  totalHits: 0,
+  estimatedBytes: 0,
+};
 
 /**
  * Cache stats. Scoped to a group if provided, otherwise global.
  * `estimatedBytes` is a rough approximation (response length + overhead).
+ *
+ * Read-only observability path: if the `response_cache` table doesn't exist
+ * yet (schema migration hasn't run on this DB — e.g. saude CLI opening the
+ * store read-only before the cache branch is deployed), return empty stats
+ * instead of throwing. Callers use this for dashboards, not critical logic.
  */
 export function getCacheStats(groupFolder?: string): CacheStats {
   const db = getDatabase();
   const whereClause = groupFolder ? 'WHERE group_folder = ?' : '';
   const args = groupFolder ? [groupFolder] : [];
 
-  const totals = db
-    .prepare(
-      `SELECT
-          COUNT(*) AS total,
-          SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) AS active,
-          SUM(CASE WHEN expires_at <= ? THEN 1 ELSE 0 END) AS expired,
-          COALESCE(SUM(hit_count), 0) AS hits,
-          COALESCE(SUM(LENGTH(response) + LENGTH(prompt_normalized) + 128), 0) AS bytes
-        FROM response_cache ${whereClause}`,
-    )
-    .get(isoNow(), isoNow(), ...args) as {
+  let totals: {
     total: number;
     active: number;
     expired: number;
     hits: number;
     bytes: number;
   };
+  try {
+    totals = db
+      .prepare(
+        `SELECT
+            COUNT(*) AS total,
+            SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) AS active,
+            SUM(CASE WHEN expires_at <= ? THEN 1 ELSE 0 END) AS expired,
+            COALESCE(SUM(hit_count), 0) AS hits,
+            COALESCE(SUM(LENGTH(response) + LENGTH(prompt_normalized) + 128), 0) AS bytes
+          FROM response_cache ${whereClause}`,
+      )
+      .get(isoNow(), isoNow(), ...args) as {
+      total: number;
+      active: number;
+      expired: number;
+      hits: number;
+      bytes: number;
+    };
+  } catch (err) {
+    if ((err as { code?: string } | null)?.code === 'SQLITE_ERROR') {
+      return EMPTY_STATS;
+    }
+    throw err;
+  }
 
   return {
     total: totals.total ?? 0,

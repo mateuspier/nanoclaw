@@ -100,6 +100,26 @@ function createSchema(database: Database.Database): void {
       container_config TEXT,
       requires_trigger INTEGER DEFAULT 1
     );
+    CREATE TABLE IF NOT EXISTS response_cache (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hash TEXT UNIQUE NOT NULL,
+      group_folder TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      prompt_normalized TEXT NOT NULL,
+      prompt_preview TEXT NOT NULL,
+      response TEXT NOT NULL,
+      ttl_seconds INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      hit_count INTEGER DEFAULT 0,
+      last_hit_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_response_cache_lookup
+      ON response_cache (group_folder, hash, expires_at);
+    CREATE INDEX IF NOT EXISTS idx_response_cache_expiry
+      ON response_cache (expires_at);
+    CREATE INDEX IF NOT EXISTS idx_response_cache_pattern
+      ON response_cache (group_folder, prompt_normalized);
   `);
 
   // Add context_mode column if it doesn't exist (migration for existing DBs)
@@ -157,6 +177,18 @@ function createSchema(database: Database.Database): void {
   } catch {
     /* columns already exist */
   }
+}
+
+/**
+ * Return the active Database handle. Throws if initDatabase / _initTestDatabase
+ * has not been called yet — safer than exporting the module variable so callers
+ * can't accidentally hold a stale reference across test resets.
+ */
+export function getDatabase(): Database.Database {
+  if (!db) {
+    throw new Error('Database not initialized — call initDatabase() first');
+  }
+  return db;
 }
 
 export function initDatabase(): void {
@@ -520,7 +552,6 @@ export function logTaskRun(log: TaskRunLog): void {
   );
 }
 
-
 // --- Workflow approval accessors ---
 
 export function createApproval(approval: WorkflowApproval): void {
@@ -546,7 +577,9 @@ export function createApproval(approval: WorkflowApproval): void {
 
 export function getPendingApproval(id: string): WorkflowApproval | undefined {
   return db
-    .prepare("SELECT * FROM workflow_approvals WHERE id = ? AND status = 'pending'")
+    .prepare(
+      "SELECT * FROM workflow_approvals WHERE id = ? AND status = 'pending'",
+    )
     .get(id) as WorkflowApproval | undefined;
 }
 

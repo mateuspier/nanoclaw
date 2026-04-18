@@ -151,7 +151,9 @@ export function upsertContact(input: UpsertContactInput): ContactRecord {
       `SELECT * FROM contacts
         WHERE business_slug = ? AND channel = ? AND phone = ?`,
     )
-    .get(input.businessSlug, input.channel, input.phone) as ContactRow | undefined;
+    .get(input.businessSlug, input.channel, input.phone) as
+    | ContactRow
+    | undefined;
 
   if (!existing) {
     db.prepare(
@@ -175,11 +177,16 @@ export function upsertContact(input: UpsertContactInput): ContactRecord {
   } else {
     // Merge updates — undefined = keep existing, anything else = write.
     const next = {
-      first_name: input.firstName === undefined ? existing.first_name : input.firstName,
-      last_name: input.lastName === undefined ? existing.last_name : input.lastName,
-      language: input.language === undefined ? existing.language : input.language,
+      first_name:
+        input.firstName === undefined ? existing.first_name : input.firstName,
+      last_name:
+        input.lastName === undefined ? existing.last_name : input.lastName,
+      language:
+        input.language === undefined ? existing.language : input.language,
       tags_json:
-        input.tags === undefined ? existing.tags_json : JSON.stringify(input.tags),
+        input.tags === undefined
+          ? existing.tags_json
+          : JSON.stringify(input.tags),
       last_seen_at: now,
       conversation_count: input.touch
         ? existing.conversation_count + 1
@@ -322,12 +329,16 @@ export function addTag(
 ): ContactRecord {
   const contact = getContact(businessSlug, channel, phone);
   if (!contact) {
-    throw new Error(`addTag: contact not found (${businessSlug}/${channel}/${phone})`);
+    throw new Error(
+      `addTag: contact not found (${businessSlug}/${channel}/${phone})`,
+    );
   }
   if (!contact.tags.includes(tag)) {
     const nextTags = [...contact.tags, tag];
     getDatabase()
-      .prepare(`UPDATE contacts SET tags_json = ?, last_seen_at = ? WHERE id = ?`)
+      .prepare(
+        `UPDATE contacts SET tags_json = ?, last_seen_at = ? WHERE id = ?`,
+      )
       .run(JSON.stringify(nextTags), nowIso(), contact.id);
   }
   return getContactById(contact.id)!;
@@ -346,7 +357,9 @@ export function removeTag(
   const nextTags = contact.tags.filter((t) => t !== tag);
   if (nextTags.length !== contact.tags.length) {
     getDatabase()
-      .prepare(`UPDATE contacts SET tags_json = ?, last_seen_at = ? WHERE id = ?`)
+      .prepare(
+        `UPDATE contacts SET tags_json = ?, last_seen_at = ? WHERE id = ?`,
+      )
       .run(JSON.stringify(nextTags), nowIso(), contact.id);
   }
   return getContactById(contact.id)!;

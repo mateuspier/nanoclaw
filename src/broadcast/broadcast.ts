@@ -185,20 +185,31 @@ const TEMPLATE_TOKEN_RE = /\{\{\s*([a-z_][a-z0-9_]*)\s*\}\}/gi;
  * else in the template is passed through untouched. Intentionally tiny —
  * we don't want template injection risks from user-editable content.
  */
-export function renderTemplate(template: string, contact: ContactRecord): string {
-  const rendered = template.replace(TEMPLATE_TOKEN_RE, (_match, varName: string) => {
-    const lower = varName.toLowerCase();
-    if (lower === 'first_name') return contact.firstName ?? '';
-    if (lower === 'last_name') return contact.lastName ?? '';
-    if (lower === 'language') return contact.language ?? '';
-    if (lower === 'business') return contact.businessSlug;
-    if (lower.startsWith('tag_')) {
-      const tag = lower.slice(4);
-      return contact.tags.map((t) => t.toLowerCase()).includes(tag) ? 'yes' : '';
-    }
-    return '';
-  });
-  return rendered.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+export function renderTemplate(
+  template: string,
+  contact: ContactRecord,
+): string {
+  const rendered = template.replace(
+    TEMPLATE_TOKEN_RE,
+    (_match, varName: string) => {
+      const lower = varName.toLowerCase();
+      if (lower === 'first_name') return contact.firstName ?? '';
+      if (lower === 'last_name') return contact.lastName ?? '';
+      if (lower === 'language') return contact.language ?? '';
+      if (lower === 'business') return contact.businessSlug;
+      if (lower.startsWith('tag_')) {
+        const tag = lower.slice(4);
+        return contact.tags.map((t) => t.toLowerCase()).includes(tag)
+          ? 'yes'
+          : '';
+      }
+      return '';
+    },
+  );
+  return rendered
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 // ── Create ────────────────────────────────────────────────────────────────
@@ -276,7 +287,9 @@ function validateSpec(spec: BroadcastSpec): void {
     throw new Error('createBroadcast: template must be non-empty');
   }
   if (spec.segment.businessSlug !== spec.businessSlug) {
-    throw new Error('createBroadcast: segment.businessSlug must match spec.businessSlug');
+    throw new Error(
+      'createBroadcast: segment.businessSlug must match spec.businessSlug',
+    );
   }
   if (spec.segment.channel !== spec.channel) {
     throw new Error('createBroadcast: segment.channel must match spec.channel');
@@ -339,7 +352,8 @@ export interface ExecuteOptions {
 
 const DEFAULT_THROTTLE_MS = 1000;
 
-const realSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+const realSleep = (ms: number): Promise<void> =>
+  new Promise((r) => setTimeout(r, ms));
 
 /**
  * Dispatch pending deliveries for a broadcast. Safe to re-run: deliveries
@@ -453,8 +467,7 @@ export async function executeBroadcast(
       markDelivery.run('sent', rendered, result.sid, null, null, now(), row.id);
       sent += 1;
     } catch (err) {
-      const code =
-        err instanceof OutboundMessagingError ? err.code : 'unknown';
+      const code = err instanceof OutboundMessagingError ? err.code : 'unknown';
       const message = err instanceof Error ? err.message : String(err);
       markDelivery.run('failed', rendered, null, code, message, now(), row.id);
       failed += 1;

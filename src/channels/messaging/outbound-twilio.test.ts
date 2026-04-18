@@ -13,19 +13,29 @@ import {
 describe('resolveSender', () => {
   it('returns the raw phone for SMS', () => {
     expect(
-      resolveSender({ phone_number: '+12762509968', sms: true, whatsapp: false }, 'sms'),
+      resolveSender(
+        { phone_number: '+12762509968', sms: true, whatsapp: false },
+        'sms',
+      ),
     ).toEqual({ fromValue: '+12762509968' });
   });
 
   it('adds whatsapp: prefix for WhatsApp', () => {
     expect(
-      resolveSender({ phone_number: '+12762509968', sms: true, whatsapp: true }, 'whatsapp'),
+      resolveSender(
+        { phone_number: '+12762509968', sms: true, whatsapp: true },
+        'whatsapp',
+      ),
     ).toEqual({ fromValue: 'whatsapp:+12762509968' });
   });
 
   it('throws when the business has no phone', () => {
-    expect(() => resolveSender({ phone_number: null }, 'sms')).toThrow(OutboundMessagingError);
-    expect(() => resolveSender(undefined, 'sms')).toThrow(OutboundMessagingError);
+    expect(() => resolveSender({ phone_number: null }, 'sms')).toThrow(
+      OutboundMessagingError,
+    );
+    expect(() => resolveSender(undefined, 'sms')).toThrow(
+      OutboundMessagingError,
+    );
   });
 
   it('throws when SMS is explicitly disabled', () => {
@@ -35,7 +45,9 @@ describe('resolveSender', () => {
   });
 
   it('throws when WhatsApp is not explicitly enabled (default deny)', () => {
-    expect(() => resolveSender({ phone_number: '+1' }, 'whatsapp')).toThrow(/whatsapp is disabled/i);
+    expect(() => resolveSender({ phone_number: '+1' }, 'whatsapp')).toThrow(
+      /whatsapp is disabled/i,
+    );
     expect(() =>
       resolveSender({ phone_number: '+1', whatsapp: false }, 'whatsapp'),
     ).toThrow(/whatsapp is disabled/i);
@@ -50,15 +62,21 @@ describe('resolveRecipient', () => {
   });
 
   it('prefixes whatsapp: for WhatsApp', () => {
-    expect(resolveRecipient('+353851234567', 'whatsapp')).toBe('whatsapp:+353851234567');
+    expect(resolveRecipient('+353851234567', 'whatsapp')).toBe(
+      'whatsapp:+353851234567',
+    );
   });
 
   it('rejects missing country code', () => {
-    expect(() => resolveRecipient('5551234', 'sms')).toThrow(OutboundMessagingError);
+    expect(() => resolveRecipient('5551234', 'sms')).toThrow(
+      OutboundMessagingError,
+    );
   });
 
   it('rejects pre-prefixed input (must be E.164)', () => {
-    expect(() => resolveRecipient('whatsapp:+123', 'whatsapp')).toThrow(/channel prefix/i);
+    expect(() => resolveRecipient('whatsapp:+123', 'whatsapp')).toThrow(
+      /channel prefix/i,
+    );
   });
 
   it('rejects numbers starting with +0', () => {
@@ -72,15 +90,24 @@ describe('resolveRecipient', () => {
 
 // ── sendOutbound ──────────────────────────────────────────────────────────
 
-function stubTransport(response: { status: number; text: string }): TwilioTransport {
+function stubTransport(response: {
+  status: number;
+  text: string;
+}): TwilioTransport {
   return { post: vi.fn().mockResolvedValue(response) } as TwilioTransport;
 }
 
 describe('sendOutbound', () => {
-  const validConfig = { phone_number: '+12762623230', sms: true, whatsapp: true };
+  const validConfig = {
+    phone_number: '+12762623230',
+    sms: true,
+    whatsapp: true,
+  };
 
   it('sends an SMS with correct From/To/Body', async () => {
-    const post = vi.fn().mockResolvedValue({ status: 201, text: '{"sid":"SM_abc"}' });
+    const post = vi
+      .fn()
+      .mockResolvedValue({ status: 201, text: '{"sid":"SM_abc"}' });
     const result = await sendOutbound({
       config: validConfig,
       message: {
@@ -104,7 +131,9 @@ describe('sendOutbound', () => {
   });
 
   it('sends a WhatsApp message with whatsapp: prefix on both ends', async () => {
-    const post = vi.fn().mockResolvedValue({ status: 201, text: '{"sid":"SM_wa"}' });
+    const post = vi
+      .fn()
+      .mockResolvedValue({ status: 201, text: '{"sid":"SM_wa"}' });
     const result = await sendOutbound({
       config: validConfig,
       message: {
@@ -128,7 +157,12 @@ describe('sendOutbound', () => {
     await expect(
       sendOutbound({
         config: validConfig,
-        message: { businessSlug: 'x', channel: 'sms', toPhone: '+1234567890', body: '   ' },
+        message: {
+          businessSlug: 'x',
+          channel: 'sms',
+          toPhone: '+1234567890',
+          body: '   ',
+        },
         transport: stubTransport({ status: 201, text: '{}' }),
       }),
     ).rejects.toMatchObject({ code: 'body-empty' });
@@ -157,18 +191,30 @@ describe('sendOutbound', () => {
     await expect(
       sendOutbound({
         config: validConfig,
-        message: { businessSlug: 'x', channel: 'sms', toPhone: '+19999999999', body: 'x' },
+        message: {
+          businessSlug: 'x',
+          channel: 'sms',
+          toPhone: '+19999999999',
+          body: 'x',
+        },
         transport: { post },
       }),
     ).rejects.toThrow(/Twilio API 400.*Invalid 'To'/);
   });
 
   it('surfaces twilio-api code on failure', async () => {
-    const post = vi.fn().mockResolvedValue({ status: 503, text: 'Service Unavailable' });
+    const post = vi
+      .fn()
+      .mockResolvedValue({ status: 503, text: 'Service Unavailable' });
     try {
       await sendOutbound({
         config: validConfig,
-        message: { businessSlug: 'x', channel: 'sms', toPhone: '+12762509968', body: 'x' },
+        message: {
+          businessSlug: 'x',
+          channel: 'sms',
+          toPhone: '+12762509968',
+          body: 'x',
+        },
         transport: { post },
       });
       throw new Error('should have thrown');
@@ -185,7 +231,12 @@ describe('sendOutbound', () => {
     await expect(
       sendOutbound({
         config: validConfig,
-        message: { businessSlug: 'x', channel: 'sms', toPhone: 'not-a-number', body: 'x' },
+        message: {
+          businessSlug: 'x',
+          channel: 'sms',
+          toPhone: 'not-a-number',
+          body: 'x',
+        },
         transport: { post },
       }),
     ).rejects.toMatchObject({ code: 'invalid-recipient' });

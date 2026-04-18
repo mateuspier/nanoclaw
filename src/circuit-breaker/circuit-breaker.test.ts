@@ -38,11 +38,11 @@ describe('registry', () => {
     getBreaker('twilio');
     getBreaker('claude');
     getBreaker('gemini');
-    expect(getAllBreakerStats().map((s) => s.name).sort()).toEqual([
-      'claude',
-      'gemini',
-      'twilio',
-    ]);
+    expect(
+      getAllBreakerStats()
+        .map((s) => s.name)
+        .sort(),
+    ).toEqual(['claude', 'gemini', 'twilio']);
   });
 });
 
@@ -69,19 +69,39 @@ describe('state: closed (happy path)', () => {
   it('propagates errors without tripping below threshold', async () => {
     const b = getBreaker('dep', { failureThreshold: 5 });
     for (let i = 0; i < 4; i++) {
-      await expect(b.execute(async () => { throw new Error('x'); })).rejects.toThrow('x');
+      await expect(
+        b.execute(async () => {
+          throw new Error('x');
+        }),
+      ).rejects.toThrow('x');
     }
     expect(b.getState()).toBe('closed');
   });
 
   it('resets consecutive-failure counter on success', async () => {
     const b = getBreaker('dep', { failureThreshold: 3 });
-    await expect(b.execute(async () => { throw new Error('x'); })).rejects.toThrow();
-    await expect(b.execute(async () => { throw new Error('x'); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error('x');
+      }),
+    ).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error('x');
+      }),
+    ).rejects.toThrow();
     await b.execute(async () => 'ok');
     // consecutive counter reset; need 3 more failures to open
-    await expect(b.execute(async () => { throw new Error('x'); })).rejects.toThrow();
-    await expect(b.execute(async () => { throw new Error('x'); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error('x');
+      }),
+    ).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error('x');
+      }),
+    ).rejects.toThrow();
     expect(b.getState()).toBe('closed');
   });
 });
@@ -92,14 +112,22 @@ describe('opening', () => {
   it('opens after N consecutive failures', async () => {
     const b = getBreaker('dep', { failureThreshold: 3 });
     for (let i = 0; i < 3; i++) {
-      await expect(b.execute(async () => { throw new Error('x'); })).rejects.toThrow('x');
+      await expect(
+        b.execute(async () => {
+          throw new Error('x');
+        }),
+      ).rejects.toThrow('x');
     }
     expect(b.getState()).toBe('open');
   });
 
   it('short-circuits calls when open — does not invoke fn', async () => {
     const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 60_000 });
-    await expect(b.execute(async () => { throw new Error('boom'); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow();
     expect(b.getState()).toBe('open');
 
     const spy = vi.fn(async () => 'should-not-run');
@@ -109,7 +137,11 @@ describe('opening', () => {
 
   it('CircuitOpenError carries retryAfterMs', async () => {
     const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 30_000 });
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
 
     try {
       await b.execute(async () => 'x');
@@ -125,7 +157,11 @@ describe('opening', () => {
 
   it('counts short-circuited calls in stats', async () => {
     const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 60_000 });
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     await expect(b.execute(async () => 'x')).rejects.toThrow();
     await expect(b.execute(async () => 'x')).rejects.toThrow();
     const stats = b.getStats();
@@ -141,7 +177,11 @@ describe('half-open probe', () => {
     const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 1000 });
 
     // Trip it open.
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     expect(b.getState()).toBe('open');
     expect(b.isEligibleForProbe()).toBe(false);
 
@@ -160,7 +200,11 @@ describe('half-open probe', () => {
     vi.useFakeTimers();
     const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 100 });
 
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(150);
 
     const result = await b.execute(async () => 'recovered');
@@ -172,18 +216,34 @@ describe('half-open probe', () => {
     vi.useFakeTimers();
     const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 100 });
 
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(150);
 
-    await expect(b.execute(async () => { throw new Error('still bad'); })).rejects.toThrow('still bad');
+    await expect(
+      b.execute(async () => {
+        throw new Error('still bad');
+      }),
+    ).rejects.toThrow('still bad');
     expect(b.getState()).toBe('open');
   });
 
   it('serializes half-open probes — second concurrent call short-circuits', async () => {
     vi.useFakeTimers();
-    const b = getBreaker('dep', { failureThreshold: 1, cooldownMs: 100, halfOpenTimeoutMs: 5000 });
+    const b = getBreaker('dep', {
+      failureThreshold: 1,
+      cooldownMs: 100,
+      halfOpenTimeoutMs: 5000,
+    });
 
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(150);
 
     // First probe: slow-running
@@ -193,9 +253,9 @@ describe('half-open probe', () => {
     });
 
     // Second call while probe is in flight
-    await expect(b.execute(async () => 'should-short-circuit')).rejects.toBeInstanceOf(
-      CircuitOpenError,
-    );
+    await expect(
+      b.execute(async () => 'should-short-circuit'),
+    ).rejects.toBeInstanceOf(CircuitOpenError);
 
     // Let the probe finish
     await vi.advanceTimersByTimeAsync(250);
@@ -211,7 +271,11 @@ describe('half-open probe', () => {
       halfOpenTimeoutMs: 500,
     });
 
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     await vi.advanceTimersByTimeAsync(150);
 
     const neverResolves = new Promise((_resolve) => {});
@@ -237,13 +301,21 @@ describe('isFailure filter', () => {
 
     // These are "expected" and must NOT count toward the threshold
     for (let i = 0; i < 10; i++) {
-      await expect(b.execute(async () => { throw new Error('expected-bad-input'); })).rejects.toThrow();
+      await expect(
+        b.execute(async () => {
+          throw new Error('expected-bad-input');
+        }),
+      ).rejects.toThrow();
     }
     expect(b.getState()).toBe('closed');
 
     // These DO count
     for (let i = 0; i < 2; i++) {
-      await expect(b.execute(async () => { throw new Error('infra-boom'); })).rejects.toThrow();
+      await expect(
+        b.execute(async () => {
+          throw new Error('infra-boom');
+        }),
+      ).rejects.toThrow();
     }
     expect(b.getState()).toBe('open');
   });
@@ -254,7 +326,11 @@ describe('isFailure filter', () => {
 describe('reset', () => {
   it('returns an open breaker to closed and clears counters', async () => {
     const b = getBreaker('dep', { failureThreshold: 1 });
-    await expect(b.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      b.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     expect(b.getState()).toBe('open');
     b.reset();
     expect(b.getState()).toBe('closed');
@@ -270,7 +346,11 @@ describe('isolation', () => {
     const a = getBreaker('a', { failureThreshold: 1 });
     const b = getBreaker('b', { failureThreshold: 1 });
 
-    await expect(a.execute(async () => { throw new Error(); })).rejects.toThrow();
+    await expect(
+      a.execute(async () => {
+        throw new Error();
+      }),
+    ).rejects.toThrow();
     expect(a.getState()).toBe('open');
     expect(b.getState()).toBe('closed');
 

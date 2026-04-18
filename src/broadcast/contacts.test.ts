@@ -126,8 +126,12 @@ describe('upsertContact', () => {
       phone: '+353851234567',
       firstName: 'BR',
     });
-    expect(getContact('biz-ie-01', 'whatsapp', '+353851234567')!.firstName).toBe('IE');
-    expect(getContact('biz-br-01', 'whatsapp', '+353851234567')!.firstName).toBe('BR');
+    expect(
+      getContact('biz-ie-01', 'whatsapp', '+353851234567')!.firstName,
+    ).toBe('IE');
+    expect(
+      getContact('biz-br-01', 'whatsapp', '+353851234567')!.firstName,
+    ).toBe('BR');
   });
 
   it('distinguishes (biz, channel, phone) uniquely — same phone, different channel = different rows', () => {
@@ -258,7 +262,9 @@ describe('optIn + optOut', () => {
 });
 
 describe('isEligibleFor', () => {
-  function seedOptedIn(purposes: ('marketing' | 'utility' | 'transactional')[]) {
+  function seedOptedIn(
+    purposes: ('marketing' | 'utility' | 'transactional')[],
+  ) {
     upsertContact({ businessSlug: 'b', channel: 'whatsapp', phone: '+1' });
     return optIn({
       businessSlug: 'b',
@@ -360,7 +366,9 @@ describe('findContacts', () => {
 
   beforeEach(() => {
     // 3 opted-in marketing contacts in biz-ie-01 with different tags
-    seedEligible('biz-ie-01', '+1', ['cork', 'housing'], 'pt-BR', ['marketing']);
+    seedEligible('biz-ie-01', '+1', ['cork', 'housing'], 'pt-BR', [
+      'marketing',
+    ]);
     seedEligible('biz-ie-01', '+2', ['dublin'], 'pt-BR', ['marketing']);
     seedEligible('biz-ie-01', '+3', ['cork'], 'en', ['marketing']);
     // 1 opted in for utility only

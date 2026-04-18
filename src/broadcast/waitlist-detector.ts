@@ -62,11 +62,21 @@ function tokenize(normalized: string): string[] {
  */
 export function detectWaitlistConfirmation(body: string): WaitlistDetection {
   if (!body || typeof body !== 'string') {
-    return { isConfirmation: false, keyword: null, language: null, confidence: 0 };
+    return {
+      isConfirmation: false,
+      keyword: null,
+      language: null,
+      confidence: 0,
+    };
   }
   const normalized = normalize(body);
   if (normalized.length === 0) {
-    return { isConfirmation: false, keyword: null, language: null, confidence: 0 };
+    return {
+      isConfirmation: false,
+      keyword: null,
+      language: null,
+      confidence: 0,
+    };
   }
   const tokens = tokenize(normalized);
 

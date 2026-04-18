@@ -35,10 +35,7 @@ export interface InboundOptOutResult {
   /** True when we recorded a new opt-out on this call. */
   actedOn: boolean;
   /** Short machine-readable reason when actedOn is false. */
-  reason?:
-    | 'not-opt-out'
-    | 'already-opted-out'
-    | 'low-confidence';
+  reason?: 'not-opt-out' | 'already-opted-out' | 'low-confidence';
   detection: OptOutDetection;
   /** Contact after the opt-out, when actedOn is true. */
   contact?: ContactRecord;

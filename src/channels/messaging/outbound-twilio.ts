@@ -70,10 +70,16 @@ export function resolveSender(
   channel: 'sms' | 'whatsapp',
 ): { fromValue: string } {
   if (!config || !config.phone_number) {
-    throw new OutboundMessagingError('no-phone', 'no Twilio phone configured for this business');
+    throw new OutboundMessagingError(
+      'no-phone',
+      'no Twilio phone configured for this business',
+    );
   }
   if (channel === 'sms' && config.sms === false) {
-    throw new OutboundMessagingError('channel-disabled', 'sms is disabled for this business');
+    throw new OutboundMessagingError(
+      'channel-disabled',
+      'sms is disabled for this business',
+    );
   }
   if (channel === 'whatsapp' && config.whatsapp !== true) {
     throw new OutboundMessagingError(
@@ -82,16 +88,24 @@ export function resolveSender(
     );
   }
   const fromValue =
-    channel === 'whatsapp' ? `whatsapp:${config.phone_number}` : config.phone_number;
+    channel === 'whatsapp'
+      ? `whatsapp:${config.phone_number}`
+      : config.phone_number;
   return { fromValue };
 }
 
 /**
  * Resolve the "To" value. Validates E.164 shape and adds the channel prefix.
  */
-export function resolveRecipient(toPhone: string, channel: 'sms' | 'whatsapp'): string {
+export function resolveRecipient(
+  toPhone: string,
+  channel: 'sms' | 'whatsapp',
+): string {
   if (!toPhone || typeof toPhone !== 'string') {
-    throw new OutboundMessagingError('invalid-recipient', 'recipient phone is empty');
+    throw new OutboundMessagingError(
+      'invalid-recipient',
+      'recipient phone is empty',
+    );
   }
   const trimmed = toPhone.trim();
   if (trimmed.startsWith('whatsapp:')) {
@@ -120,7 +134,10 @@ export interface TwilioTransport {
   post(body: URLSearchParams): Promise<{ status: number; text: string }>;
 }
 
-export function createTwilioTransport(accountSid: string, authToken: string): TwilioTransport {
+export function createTwilioTransport(
+  accountSid: string,
+  authToken: string,
+): TwilioTransport {
   const agent = new https.Agent({ keepAlive: true, maxSockets: 10 });
   return {
     post(body) {
@@ -141,9 +158,7 @@ export function createTwilioTransport(accountSid: string, authToken: string): Tw
           (res) => {
             let text = '';
             res.on('data', (chunk: Buffer) => (text += chunk.toString()));
-            res.on('end', () =>
-              resolve({ status: res.statusCode ?? 0, text }),
-            );
+            res.on('end', () => resolve({ status: res.statusCode ?? 0, text }));
           },
         );
         req.on('error', reject);

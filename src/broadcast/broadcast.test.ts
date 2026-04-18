@@ -30,7 +30,9 @@ function stubTransportOk(): TwilioTransport {
   return {
     post: vi.fn(async () => ({
       status: 201,
-      text: JSON.stringify({ sid: `SM_${Math.random().toString(36).slice(2, 8)}` }),
+      text: JSON.stringify({
+        sid: `SM_${Math.random().toString(36).slice(2, 8)}`,
+      }),
     })),
   };
 }
@@ -55,7 +57,13 @@ function seedOptedIn(
     language,
     tags,
   });
-  optIn({ businessSlug: biz, channel: 'whatsapp', phone, source: 't', purposes });
+  optIn({
+    businessSlug: biz,
+    channel: 'whatsapp',
+    phone,
+    source: 't',
+    purposes,
+  });
 }
 
 // ── renderTemplate ────────────────────────────────────────────────────────
@@ -216,7 +224,11 @@ describe('createBroadcast', () => {
         channel: 'whatsapp',
         purpose: 'marketing',
         template: '   ',
-        segment: { businessSlug: 'b', channel: 'whatsapp', purpose: 'marketing' },
+        segment: {
+          businessSlug: 'b',
+          channel: 'whatsapp',
+          purpose: 'marketing',
+        },
       }),
     ).toThrow(/template must be non-empty/);
   });
@@ -229,7 +241,11 @@ describe('createBroadcast', () => {
         channel: 'whatsapp',
         purpose: 'marketing',
         template: 'hi',
-        segment: { businessSlug: 'b', channel: 'whatsapp', purpose: 'marketing' },
+        segment: {
+          businessSlug: 'b',
+          channel: 'whatsapp',
+          purpose: 'marketing',
+        },
       }),
     ).toThrow(/broadcastKey must be at least/);
   });
@@ -242,7 +258,11 @@ describe('createBroadcast', () => {
         channel: 'whatsapp',
         purpose: 'marketing',
         template: 'x',
-        segment: { businessSlug: 'biz-br-01', channel: 'whatsapp', purpose: 'marketing' },
+        segment: {
+          businessSlug: 'biz-br-01',
+          channel: 'whatsapp',
+          purpose: 'marketing',
+        },
       }),
     ).toThrow(/segment.businessSlug/);
     expect(() =>
@@ -252,7 +272,11 @@ describe('createBroadcast', () => {
         channel: 'whatsapp',
         purpose: 'marketing',
         template: 'x',
-        segment: { businessSlug: 'biz-ie-01', channel: 'sms', purpose: 'marketing' },
+        segment: {
+          businessSlug: 'biz-ie-01',
+          channel: 'sms',
+          purpose: 'marketing',
+        },
       }),
     ).toThrow(/segment.channel/);
     expect(() =>
@@ -262,7 +286,11 @@ describe('createBroadcast', () => {
         channel: 'whatsapp',
         purpose: 'marketing',
         template: 'x',
-        segment: { businessSlug: 'biz-ie-01', channel: 'whatsapp', purpose: 'utility' },
+        segment: {
+          businessSlug: 'biz-ie-01',
+          channel: 'whatsapp',
+          purpose: 'utility',
+        },
       }),
     ).toThrow(/segment.purpose/);
   });
@@ -329,7 +357,12 @@ describe('executeBroadcast', () => {
     });
 
     // One user opts out mid-campaign.
-    optOut({ businessSlug: 'biz-ie-01', channel: 'whatsapp', phone: '+353852222222', reason: 'STOP' });
+    optOut({
+      businessSlug: 'biz-ie-01',
+      channel: 'whatsapp',
+      phone: '+353852222222',
+      reason: 'STOP',
+    });
 
     const transport = stubTransportOk();
     const summary = await executeBroadcast(b.id, {
@@ -343,9 +376,13 @@ describe('executeBroadcast', () => {
     expect(summary.skipped).toBe(1);
     expect(transport.post).toHaveBeenCalledTimes(1);
     const deliveries = getDeliveries(b.id);
-    const skippedContactId = deliveries.find((d) => d.status === 'skipped')?.contactId;
+    const skippedContactId = deliveries.find(
+      (d) => d.status === 'skipped',
+    )?.contactId;
     expect(skippedContactId).toBeDefined();
-    expect(deliveries.find((d) => d.status === 'sent')?.renderedBody).toBe('Oi Ana');
+    expect(deliveries.find((d) => d.status === 'sent')?.renderedBody).toBe(
+      'Oi Ana',
+    );
   });
 
   it('marks Twilio errors as failed and continues', async () => {

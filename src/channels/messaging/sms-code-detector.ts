@@ -92,7 +92,9 @@ export function detectVerificationCode(body: string): CodeDetection {
     signals.push('anti-signal');
   }
 
-  const hasVerificationPhrase = VERIFICATION_PHRASES.some((re) => re.test(body));
+  const hasVerificationPhrase = VERIFICATION_PHRASES.some((re) =>
+    re.test(body),
+  );
   if (hasVerificationPhrase) signals.push('verification-phrase');
 
   // Digit group: 4–8 consecutive digits, optionally split by `-` or ` `.
@@ -152,7 +154,12 @@ export function formatCodeAlert(input: {
   detection: CodeDetection;
 }): string {
   const { businessSlug, businessName, fromNumber, body, detection } = input;
-  const tier = detection.confidence >= 0.8 ? '🔐' : detection.confidence >= 0.5 ? '🔎' : 'ℹ️';
+  const tier =
+    detection.confidence >= 0.8
+      ? '🔐'
+      : detection.confidence >= 0.5
+        ? '🔎'
+        : 'ℹ️';
   const lines = [
     `${tier} <b>SMS verification code</b> — [${businessSlug}] ${businessName}`,
     `from <code>${escapeHtml(fromNumber)}</code>${detection.service ? ` · service: <b>${detection.service}</b>` : ''}`,
@@ -165,8 +172,5 @@ export function formatCodeAlert(input: {
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

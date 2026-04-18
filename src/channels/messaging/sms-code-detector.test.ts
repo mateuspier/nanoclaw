@@ -1,18 +1,25 @@
 import { describe, it, expect } from 'vitest';
 
-import { detectVerificationCode, formatCodeAlert } from './sms-code-detector.js';
+import {
+  detectVerificationCode,
+  formatCodeAlert,
+} from './sms-code-detector.js';
 
 describe('detectVerificationCode', () => {
   // High-confidence: service + verification phrase + digit group + short
   it('detects a WhatsApp verification code', () => {
-    const r = detectVerificationCode('WhatsApp: your code is 123-456. Do not share.');
+    const r = detectVerificationCode(
+      'WhatsApp: your code is 123-456. Do not share.',
+    );
     expect(r.code).toBe('123456');
     expect(r.service).toBe('WhatsApp');
     expect(r.confidence).toBeGreaterThanOrEqual(0.8);
   });
 
   it('detects a Stripe PIN', () => {
-    const r = detectVerificationCode('Your Stripe verification code is 847291.');
+    const r = detectVerificationCode(
+      'Your Stripe verification code is 847291.',
+    );
     expect(r.code).toBe('847291');
     expect(r.service).toBe('Stripe');
     expect(r.confidence).toBeGreaterThanOrEqual(0.8);
@@ -51,13 +58,17 @@ describe('detectVerificationCode', () => {
 
   // Anti-signals: should NOT match
   it('rejects tracking numbers', () => {
-    const r = detectVerificationCode('Your shipment tracking: 123456789 arrives Monday.');
+    const r = detectVerificationCode(
+      'Your shipment tracking: 123456789 arrives Monday.',
+    );
     expect(r.code).toBeNull();
     expect(r.confidence).toBeLessThan(0.5);
   });
 
   it('rejects payment confirmations', () => {
-    const r = detectVerificationCode('Payment of R$ 1234 confirmed. Invoice 784512.');
+    const r = detectVerificationCode(
+      'Payment of R$ 1234 confirmed. Invoice 784512.',
+    );
     expect(r.code).toBeNull();
   });
 
@@ -87,7 +98,13 @@ describe('detectVerificationCode', () => {
 
   it('surfaces signals for log tuning', () => {
     const r = detectVerificationCode('WhatsApp code: 123456');
-    expect(r.signals).toEqual(expect.arrayContaining(['verification-phrase', 'digits:6', 'service:whatsapp']));
+    expect(r.signals).toEqual(
+      expect.arrayContaining([
+        'verification-phrase',
+        'digits:6',
+        'service:whatsapp',
+      ]),
+    );
   });
 });
 
@@ -118,7 +135,12 @@ describe('formatCodeAlert', () => {
       businessName: 'MiauPop',
       fromNumber: '+1000',
       body: 'Your OTP: 9281',
-      detection: { code: '9281', confidence: 0.6, service: null, signals: ['digits:4'] },
+      detection: {
+        code: '9281',
+        confidence: 0.6,
+        service: null,
+        signals: ['digits:4'],
+      },
     });
     expect(out).toContain('🔎');
     expect(out).not.toContain('🔐');

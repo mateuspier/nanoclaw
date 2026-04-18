@@ -2,12 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import { _initTestDatabase } from '../db.js';
 
-import {
-  upsertContact,
-  optIn,
-  optOut,
-  getContact,
-} from './contacts.js';
+import { upsertContact, optIn, optOut, getContact } from './contacts.js';
 import { handleInboundWaitlist } from './inbound-waitlist.js';
 
 beforeEach(() => {

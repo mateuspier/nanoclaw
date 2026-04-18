@@ -94,9 +94,11 @@ class CircuitBreakerImpl {
 
   constructor(config: CircuitBreakerConfig) {
     this.name = config.name;
-    this.failureThreshold = config.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
+    this.failureThreshold =
+      config.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
     this.cooldownMs = config.cooldownMs ?? DEFAULT_COOLDOWN_MS;
-    this.halfOpenTimeoutMs = config.halfOpenTimeoutMs ?? DEFAULT_HALF_OPEN_TIMEOUT_MS;
+    this.halfOpenTimeoutMs =
+      config.halfOpenTimeoutMs ?? DEFAULT_HALF_OPEN_TIMEOUT_MS;
     this.isFailure = config.isFailure ?? (() => true);
   }
 
@@ -186,7 +188,10 @@ class CircuitBreakerImpl {
       return;
     }
 
-    if (this.state === 'closed' && this.consecutiveFailures >= this.failureThreshold) {
+    if (
+      this.state === 'closed' &&
+      this.consecutiveFailures >= this.failureThreshold
+    ) {
       this.transitionTo('open');
     }
   }
@@ -204,7 +209,12 @@ class CircuitBreakerImpl {
       this.openedAt = null;
     }
     logger.warn(
-      { breaker: this.name, from: prev, to: next, consecutiveFailures: this.consecutiveFailures },
+      {
+        breaker: this.name,
+        from: prev,
+        to: next,
+        consecutiveFailures: this.consecutiveFailures,
+      },
       'circuit-breaker: state change',
     );
   }
@@ -232,8 +242,12 @@ class CircuitBreakerImpl {
       name: this.name,
       state: this.getState(),
       consecutiveFailures: this.consecutiveFailures,
-      lastFailureAt: this.lastFailureAt ? new Date(this.lastFailureAt).toISOString() : null,
-      lastSuccessAt: this.lastSuccessAt ? new Date(this.lastSuccessAt).toISOString() : null,
+      lastFailureAt: this.lastFailureAt
+        ? new Date(this.lastFailureAt).toISOString()
+        : null,
+      lastSuccessAt: this.lastSuccessAt
+        ? new Date(this.lastSuccessAt).toISOString()
+        : null,
       openedAt: this.openedAt ? new Date(this.openedAt).toISOString() : null,
       totalCalls: this.totalCalls,
       totalFailures: this.totalFailures,

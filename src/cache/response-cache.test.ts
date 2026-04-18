@@ -40,7 +40,9 @@ describe('normalizePrompt', () => {
   it('strips leading greetings in both pt and en', () => {
     expect(normalizePrompt('Oi, quanto custa Cork?')).toBe('quanto custa cork');
     expect(normalizePrompt('bom dia, tem anime?')).toBe('tem anime');
-    expect(normalizePrompt('Hello, what time is the drop?')).toBe('what time is the drop');
+    expect(normalizePrompt('Hello, what time is the drop?')).toBe(
+      'what time is the drop',
+    );
   });
 
   it('removes time/date-looking numbers', () => {
@@ -63,7 +65,9 @@ describe('cacheKey', () => {
   });
 
   it('differs when the group differs', () => {
-    expect(cacheKey('biz-ie-01', 'sms', 'x')).not.toBe(cacheKey('biz-br-01', 'sms', 'x'));
+    expect(cacheKey('biz-ie-01', 'sms', 'x')).not.toBe(
+      cacheKey('biz-br-01', 'sms', 'x'),
+    );
   });
 
   it('differs when the channel differs', () => {
@@ -130,7 +134,9 @@ describe('extractCacheDirectives', () => {
 
   it('caps [cache:...] at MAX_TTL_SECONDS', () => {
     // 30d requested, 7d cap
-    expect(extractCacheDirectives('x [cache:30d]').ttlSeconds).toBe(MAX_TTL_SECONDS);
+    expect(extractCacheDirectives('x [cache:30d]').ttlSeconds).toBe(
+      MAX_TTL_SECONDS,
+    );
   });
 
   it('is case-insensitive', () => {
@@ -143,9 +149,13 @@ describe('extractCacheDirectives', () => {
 
 describe('lookupCached + storeResponse', () => {
   it('returns hit:false on empty cache', () => {
-    expect(lookupCached({ groupFolder: 'biz-ie-01', channel: 'sms', prompt: 'quanto custa cork' }).hit).toBe(
-      false,
-    );
+    expect(
+      lookupCached({
+        groupFolder: 'biz-ie-01',
+        channel: 'sms',
+        prompt: 'quanto custa cork',
+      }).hit,
+    ).toBe(false);
   });
 
   it('stores and retrieves a response', () => {
@@ -241,16 +251,40 @@ describe('lookupCached + storeResponse', () => {
       response: 'BR: 2000 reais.',
     });
 
-    const ie = lookupCached({ groupFolder: 'biz-ie-01', channel: 'sms', prompt: 'quanto custa morar' });
-    const br = lookupCached({ groupFolder: 'biz-br-01', channel: 'sms', prompt: 'quanto custa morar' });
+    const ie = lookupCached({
+      groupFolder: 'biz-ie-01',
+      channel: 'sms',
+      prompt: 'quanto custa morar',
+    });
+    const br = lookupCached({
+      groupFolder: 'biz-br-01',
+      channel: 'sms',
+      prompt: 'quanto custa morar',
+    });
     expect(ie.response).toBe('IE: 1500 euros.');
     expect(br.response).toBe('BR: 2000 reais.');
   });
 
   it('upserts: a later store for the same key replaces the response', () => {
-    storeResponse({ groupFolder: 'g', channel: 'sms', prompt: 'qual preco do produto', response: 'A' });
-    storeResponse({ groupFolder: 'g', channel: 'sms', prompt: 'qual preco do produto', response: 'B' });
-    expect(lookupCached({ groupFolder: 'g', channel: 'sms', prompt: 'qual preco do produto' }).response).toBe('B');
+    storeResponse({
+      groupFolder: 'g',
+      channel: 'sms',
+      prompt: 'qual preco do produto',
+      response: 'A',
+    });
+    storeResponse({
+      groupFolder: 'g',
+      channel: 'sms',
+      prompt: 'qual preco do produto',
+      response: 'B',
+    });
+    expect(
+      lookupCached({
+        groupFolder: 'g',
+        channel: 'sms',
+        prompt: 'qual preco do produto',
+      }).response,
+    ).toBe('B');
   });
 });
 
@@ -269,11 +303,23 @@ describe('expiry', () => {
 
     // 30 min later: hit
     vi.setSystemTime(new Date('2026-04-18T10:30:00Z'));
-    expect(lookupCached({ groupFolder: 'g', channel: 'sms', prompt: 'qual horario da loja' }).hit).toBe(true);
+    expect(
+      lookupCached({
+        groupFolder: 'g',
+        channel: 'sms',
+        prompt: 'qual horario da loja',
+      }).hit,
+    ).toBe(true);
 
     // 2h later: expired
     vi.setSystemTime(new Date('2026-04-18T12:00:00Z'));
-    expect(lookupCached({ groupFolder: 'g', channel: 'sms', prompt: 'qual horario da loja' }).hit).toBe(false);
+    expect(
+      lookupCached({
+        groupFolder: 'g',
+        channel: 'sms',
+        prompt: 'qual horario da loja',
+      }).hit,
+    ).toBe(false);
   });
 
   it('pruneExpired removes only expired rows', () => {
@@ -326,7 +372,11 @@ describe('invalidation', () => {
     const removed = invalidatePattern('biz-ie-01', 'show');
     expect(removed).toBe(2);
     expect(
-      lookupCached({ groupFolder: 'biz-ie-01', channel: 'sms', prompt: 'qual horario de funcionamento' }).hit,
+      lookupCached({
+        groupFolder: 'biz-ie-01',
+        channel: 'sms',
+        prompt: 'qual horario de funcionamento',
+      }).hit,
     ).toBe(true);
   });
 
@@ -351,15 +401,38 @@ describe('invalidation', () => {
 
 describe('hit tracking', () => {
   it('counts hits on lookup', () => {
-    storeResponse({ groupFolder: 'g', channel: 'sms', prompt: 'qual preco do produto', response: 'R$10.' });
-    lookupCached({ groupFolder: 'g', channel: 'sms', prompt: 'qual preco do produto' });
-    lookupCached({ groupFolder: 'g', channel: 'sms', prompt: 'qual preco do produto' });
+    storeResponse({
+      groupFolder: 'g',
+      channel: 'sms',
+      prompt: 'qual preco do produto',
+      response: 'R$10.',
+    });
+    lookupCached({
+      groupFolder: 'g',
+      channel: 'sms',
+      prompt: 'qual preco do produto',
+    });
+    lookupCached({
+      groupFolder: 'g',
+      channel: 'sms',
+      prompt: 'qual preco do produto',
+    });
     expect(getCacheStats('g').totalHits).toBe(2);
   });
 
   it('reports stats scoped to a group', () => {
-    storeResponse({ groupFolder: 'a', channel: 'sms', prompt: 'qual horario da loja', response: 'x' });
-    storeResponse({ groupFolder: 'b', channel: 'sms', prompt: 'qual horario da loja', response: 'y' });
+    storeResponse({
+      groupFolder: 'a',
+      channel: 'sms',
+      prompt: 'qual horario da loja',
+      response: 'x',
+    });
+    storeResponse({
+      groupFolder: 'b',
+      channel: 'sms',
+      prompt: 'qual horario da loja',
+      response: 'y',
+    });
     expect(getCacheStats('a').total).toBe(1);
     expect(getCacheStats().total).toBe(2);
   });

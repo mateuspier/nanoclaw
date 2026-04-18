@@ -120,6 +120,70 @@ function createSchema(database: Database.Database): void {
       ON response_cache (expires_at);
     CREATE INDEX IF NOT EXISTS idx_response_cache_pattern
       ON response_cache (group_folder, prompt_normalized);
+
+    -- Lightweight CRM: one row per (business, channel, phone).
+    CREATE TABLE IF NOT EXISTS contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      business_slug TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      phone TEXT NOT NULL,
+      first_name TEXT,
+      last_name TEXT,
+      language TEXT,
+      tags_json TEXT NOT NULL DEFAULT '[]',
+      purposes_json TEXT NOT NULL DEFAULT '[]',
+      opted_in_at TEXT,
+      opt_in_source TEXT,
+      opted_out_at TEXT,
+      opted_out_reason TEXT,
+      conversation_count INTEGER NOT NULL DEFAULT 0,
+      first_seen_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      UNIQUE (business_slug, channel, phone)
+    );
+    CREATE INDEX IF NOT EXISTS idx_contacts_business
+      ON contacts (business_slug, channel);
+    CREATE INDEX IF NOT EXISTS idx_contacts_optin
+      ON contacts (business_slug, opted_in_at, opted_out_at);
+
+    -- Broadcast metadata: one row per broadcast campaign.
+    CREATE TABLE IF NOT EXISTS broadcasts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      broadcast_key TEXT UNIQUE NOT NULL,
+      business_slug TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      purpose TEXT NOT NULL,
+      template TEXT NOT NULL,
+      segment_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      total_targets INTEGER NOT NULL DEFAULT 0,
+      total_sent INTEGER NOT NULL DEFAULT 0,
+      total_skipped INTEGER NOT NULL DEFAULT 0,
+      total_failed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      started_at TEXT,
+      completed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_broadcasts_business
+      ON broadcasts (business_slug, created_at);
+
+    -- Per-recipient delivery row: idempotent via UNIQUE (broadcast_id, contact_id).
+    CREATE TABLE IF NOT EXISTS broadcast_deliveries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      broadcast_id INTEGER NOT NULL,
+      contact_id INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      rendered_body TEXT,
+      twilio_sid TEXT,
+      error_code TEXT,
+      error_message TEXT,
+      attempted_at TEXT,
+      UNIQUE (broadcast_id, contact_id),
+      FOREIGN KEY (broadcast_id) REFERENCES broadcasts (id),
+      FOREIGN KEY (contact_id) REFERENCES contacts (id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_broadcast_deliveries_broadcast
+      ON broadcast_deliveries (broadcast_id, status);
   `);
 
   // Add context_mode column if it doesn't exist (migration for existing DBs)

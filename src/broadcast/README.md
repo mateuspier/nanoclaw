@@ -180,9 +180,14 @@ template-approval helper in code — it's a manual workflow anyway.)
 - **No scheduling** — broadcasts are created and executed in the same
   process. Scheduling belongs in the existing `scheduled_tasks` layer
   (add a task-handler type `execute_broadcast`, pass `broadcastId`).
-- **No STOP keyword auto-handler** — the inbound webhook needs a
-  ~20-line patch to recognize opt-out keywords and call `optOut()`.
-  Documented in the next roadmap item.
+- **STOP keyword handler — code shipped, webhook wiring pending.**
+  `src/broadcast/opt-out-detector.ts` + `src/broadcast/inbound-opt-out.ts`
+  implement the detector and orchestrator (pt-BR / en / es, confidence-
+  gated, idempotent, localized confirmation reply). Wiring into
+  `src/channels/twilio.ts` is a ~15-line patch that calls
+  `handleInboundOptOut` before routing to the agent and, on `actedOn=true`,
+  sends the confirmation back through the existing reply path. Patch
+  shown below in "Wiring the STOP handler".
 - **No HTTP/MCP entrypoint for agents** — agents can't yet trigger
   broadcasts from their container. When the live-in-agent broadcast
   feature is useful, expose via MCP tool.
@@ -202,4 +207,56 @@ npx vitest run src/broadcast/
 Or from any user via the scratch env-override config pattern used by the
 cache + circuit-breaker + saude modules.
 
-Expected: 49 passing. Under 200 ms.
+Expected: **88 passing** (31 contacts + 18 broadcast + 29 opt-out +
+10 inbound-opt-out wrapper).
+
+## Wiring the STOP handler
+
+Add this inside `src/channels/twilio.ts`, in the SMS + WhatsApp webhook
+handler after `msg` has been parsed but before routing to the agent
+(roughly between lines 560 and 570, just after `senderPhone` is known):
+
+```ts
+import { handleInboundOptOut } from '../broadcast/inbound-opt-out.js';
+
+// …inside the inbound webhook handler…
+const optOutResult = handleInboundOptOut({
+  businessSlug: slug,
+  channel: isWhatsApp ? 'whatsapp' : 'sms',
+  phone: senderPhone,
+  body: msg.Body ?? '',
+});
+
+if (optOutResult.actedOn && optOutResult.confirmationMessage) {
+  // Send confirmation via the existing reply path. lastSender is set
+  // naturally by the webhook a few lines earlier, so sendMessage replies
+  // to the right person.
+  await this.sendMessage(
+    `tw:${slug}`,
+    optOutResult.confirmationMessage,
+  );
+  logger.info(
+    { slug, phone: senderPhone, keyword: optOutResult.detection.keyword },
+    'opt-out: user unsubscribed',
+  );
+  // Swallow the message — do NOT forward to the agent.
+  res.writeHead(200, { 'Content-Type': 'text/xml' });
+  res.end('<Response/>');
+  return;
+}
+
+if (!optOutResult.actedOn && optOutResult.reason === 'already-opted-out') {
+  // User is already opted out and sent another STOP-shaped message —
+  // don't reconfirm, but also don't forward to the agent (they don't
+  // want messages from us).
+  res.writeHead(200, { 'Content-Type': 'text/xml' });
+  res.end('<Response/>');
+  return;
+}
+
+// otherwise fall through to normal message handling…
+```
+
+Held for a separate reviewed commit because it touches the webhook hot
+path. Apply it + `sudo systemctl restart nanoclaw` and the STOP
+compliance loop is live.

@@ -207,8 +207,52 @@ npx vitest run src/broadcast/
 Or from any user via the scratch env-override config pattern used by the
 cache + circuit-breaker + saude modules.
 
-Expected: **88 passing** (31 contacts + 18 broadcast + 29 opt-out +
-10 inbound-opt-out wrapper).
+Expected: **118 passing** (31 contacts + 18 broadcast + 29 opt-out + 10 opt-out wrapper + 20 waitlist detector + 10 waitlist wrapper).
+
+## Wiring the waitlist handler
+
+Pre-launch waitlist capture mirrors the STOP handler, with a caller-chosen
+tag per business (`store-waitlist` for MiauPop / biz-br-01,
+`services-waitlist` for Sou da Irlanda / biz-ie-01). Add inside the SMS +
+WhatsApp webhook handler, **after** the STOP-handler block:
+
+```ts
+import { handleInboundWaitlist } from '../broadcast/inbound-waitlist.js';
+
+const waitlistByBusiness: Record<string, { tag: string; name: string; product: string }> = {
+  'biz-br-01': { tag: 'store-waitlist', name: 'MiauPop', product: 'lista de espera da loja' },
+  'biz-ie-01': { tag: 'services-waitlist', name: 'Sou da Irlanda', product: 'lista de espera dos guias' },
+};
+
+const waitlistCfg = waitlistByBusiness[slug];
+if (waitlistCfg) {
+  const r = handleInboundWaitlist({
+    businessSlug: slug,
+    channel: isWhatsApp ? 'whatsapp' : 'sms',
+    phone: senderPhone,
+    body: msg.Body ?? '',
+    waitlistTag: waitlistCfg.tag,
+    businessName: waitlistCfg.name,
+    productLabel: waitlistCfg.product,
+  });
+  if (r.actedOn && r.confirmationMessage) {
+    await this.sendMessage(`tw:${slug}`, r.confirmationMessage);
+    logger.info(
+      { slug, phone: senderPhone, tag: waitlistCfg.tag },
+      'waitlist: user subscribed',
+    );
+    res.writeHead(200, { 'Content-Type': 'text/xml' });
+    res.end('<Response/>');
+    return;
+  }
+  // not-confirmation / already-on-waitlist / opted-out → fall through to agent
+}
+```
+
+The user's CLAUDE.md already instructs the agent to direct users to reply
+**AVISAR** (the keyword). "SIM" / "yes" / "quero" are NOT recognized — the
+ambiguity risk is too high. The agent copy is fixed text that ends with
+"Responda *AVISAR*" — keep the keyword visible.
 
 ## Wiring the STOP handler
 
